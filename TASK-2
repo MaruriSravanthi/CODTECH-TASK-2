@@ -1,0 +1,249 @@
+Here is a comprehensive java program for a basic online banking system.It includes account creation,deposit/withdrawl functionality,money transfer between accounts,transaction history,and basic security features like authentication and encryption for sensitive data(such as passwords).
+
+
+import java.util.*;
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
+import java.security.*;
+import java.util.Base64;
+import java.nio.charset.StandardCharsets;
+
+class User {
+    private String username;
+    private String passwordHash; // Storing hash for security
+    private String email;
+
+    public User(String username, String password, String email) {
+        this.username = username;
+        this.passwordHash = hashPassword(password);
+        this.email = email;
+    }
+
+    private String hashPassword(String password) {
+        // A simple hash function for demonstration; use a stronger one in production
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hash=md.digest(password.getBytes(StandardCharsets.UTF_8));
+            return Base64.getEncoder().encodeToString(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public boolean checkPassword(String password) {
+        return this.passwordHash.equals(hashPassword(password));
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void updateEmail(String newEmail) {
+        this.email = newEmail;
+    }
+}
+
+class Account {
+    private String accountNumber;
+    private double balance;
+    private List<String> transactionHistory;
+
+    public Account(String accountNumber) {
+        this.accountNumber = accountNumber;
+        this.balance = 0;
+        this.transactionHistory = new ArrayList<>();
+    }
+
+    public String getAccountNumber() {
+        return accountNumber;
+    }
+
+    public double getBalance() {
+        return balance;
+    }
+
+    public void deposit(double amount) {
+        if (amount > 0) {
+            balance += amount;
+            transactionHistory.add("Deposited: $" + amount);
+        } else {
+            throw new IllegalArgumentException("Deposit amount must be positive.");
+        }
+    }
+
+    public void withdraw(double amount) {
+        if (amount > balance) {
+            throw new IllegalArgumentException("Insufficient funds.");
+        } else if (amount <= 0) {
+            throw new IllegalArgumentException("Withdrawal amount must be positive.");
+        } else {
+            balance -= amount;
+            transactionHistory.add("Withdrew: $" + amount);
+        }
+    }
+
+    public void transfer(Account targetAccount, double amount) {
+        if (amount > balance) {
+            throw new IllegalArgumentException("Insufficient funds.");
+        } else if (amount <= 0) {
+            throw new IllegalArgumentException("Transfer amount must be positive.");
+        } else {
+            this.withdraw(amount);
+            targetAccount.deposit(amount);
+            transactionHistory.add("Transferred: $" + amount + " to " + targetAccount.getAccountNumber());
+        }
+    }
+
+    public List<String> getTransactionHistory() {
+        return transactionHistory;
+    }
+}
+
+class BankingSystem {
+    private Map<String, User> users;
+    private Map<String, Account> accounts;
+
+    public BankingSystem() {
+        users = new HashMap<>();
+        accounts = new HashMap<>();
+    }
+
+    public void registerUser(String username, String password, String email) {
+        if (users.containsKey(username)) {
+            throw new IllegalArgumentException("Username already exists.");
+        }
+        users.put(username, new User(username, password, email));
+        accounts.put(username, new Account(username + "-ACC"));
+    }
+
+    public User authenticate(String username, String password) {
+        User user = users.get(username);
+        if (user != null && user.checkPassword(password)) {
+            return user;
+        } else {
+            throw new IllegalArgumentException("Invalid username or password.");
+        }
+    }
+
+    public Account getAccount(String username) {
+        return accounts.get(username);
+    }
+
+    public void updateEmail(String username, String newEmail) {
+        User user = users.get(username);
+        if (user != null) {
+            user.updateEmail(newEmail);
+        } else {
+            throw new IllegalArgumentException("User not found.");
+        }
+    }
+}
+
+public class Main {
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        BankingSystem bankingSystem = new BankingSystem();
+
+        while (true) {
+            System.out.println("1. Register\n2. Login\n3. Exit");
+            int choice = scanner.nextInt();
+            scanner.nextLine(); // consume newline
+
+            switch (choice) {
+                case 1:
+                    System.out.println("Enter username:");
+                    String regUsername = scanner.nextLine();
+                    System.out.println("Enter password:");
+                    String regPassword = scanner.nextLine();
+                    System.out.println("Enter email:");
+                    String regEmail = scanner.nextLine();
+                    bankingSystem.registerUser(regUsername, regPassword, regEmail);
+                    System.out.println("User registered successfully.");
+                    break;
+
+                case 2:
+                    System.out.println("Enter username:");
+                    String loginUsername = scanner.nextLine();
+                    System.out.println("Enter password:");
+                    String loginPassword = scanner.nextLine();
+                    try {
+                        User user = bankingSystem.authenticate(loginUsername, loginPassword);
+                        Account account = bankingSystem.getAccount(loginUsername);
+                        boolean loggedIn = true;
+
+                        while (loggedIn) {
+                            System.out.println("1. Deposit\n2. Withdraw\n3. Transfer\n4. View Balance\n5. View Transactions\n6. Update Email\n7. Logout");
+                            int userChoice = scanner.nextInt();
+                            scanner.nextLine(); // consume newline
+
+                            switch (userChoice) {
+                                case 1:
+                                    System.out.println("Enter amount to deposit:");
+                                    double depositAmount = scanner.nextDouble();
+                                    account.deposit(depositAmount);
+                                    System.out.println("Deposited successfully.");
+                                    break;
+
+                                case 2:
+                                    System.out.println("Enter amount to withdraw:");
+                                    double withdrawAmount = scanner.nextDouble();
+                                    account.withdraw(withdrawAmount);
+                                    System.out.println("Withdrawn successfully.");
+                                    break;
+
+                                case 3:
+                                    System.out.println("Enter target account number:");
+                                    String targetAccountNumber = scanner.nextLine();
+                                    Account targetAccount = bankingSystem.getAccount(targetAccountNumber);
+                                    System.out.println("Enter amount to transfer:");
+                                    double transferAmount = scanner.nextDouble();
+                                    account.transfer(targetAccount, transferAmount);
+                                    System.out.println("Transferred successfully.");
+                                    break;
+
+                                case 4:
+                                    System.out.println("Current balance: $" + account.getBalance());
+                                    break;
+
+                                case 5:
+                                    System.out.println("Transaction History: " + account.getTransactionHistory());
+                                    break;
+
+                                case 6:
+                                    System.out.println("Enter new email:");
+                                    String newEmail = scanner.nextLine();
+                                    bankingSystem.updateEmail(loginUsername, newEmail);
+                                    System.out.println("Email updated successfully.");
+                                    break;
+
+                                case 7:
+                                    loggedIn = false;
+                                    System.out.println("Logged out.");
+                                    break;
+
+                                default:
+                                    System.out.println("Invalid choice. Try again.");
+                            }
+                        }
+                    } catch (IllegalArgumentException e) {
+                        System.out.println(e.getMessage());
+                    }
+                    break;
+
+                case 3:
+                    System.out.println("Exiting...");
+                    scanner.close();
+                    return;
+
+                default:
+                    System.out.println("Invalid choice. Try again.");
+            }
+        }
+    }
+}
